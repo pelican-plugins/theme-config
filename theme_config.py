@@ -15,10 +15,13 @@
 import copy
 import logging
 import os
+import sys
 from importlib.util import module_from_spec, spec_from_file_location
 
 from pelican import signals
 from pelican.settings import get_settings_from_module
+
+import six
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +60,56 @@ def load_config(config, context) -> dict:
     return get_settings_from_module(module)
 
 
+def init_plugins(context):
+    """A fork of pelican.init_plugins() method
+
+    The primary reason for forkin is that we are initialising additional
+    plugins and the state is not clean: some plugins where already loaded
+    by Pelican().  We just need to load the new ones.
+
+    :param context: an instance of the Pelican class
+    :type context: class
+    :returns: this function does not return anything useful
+    :rtype: None
+    """
+
+    settings = context.settings
+    logger.debug('Temporarily adding PLUGIN_PATHS to system path')
+    _sys_path = sys.path[:]
+    for pluginpath in settings['PLUGIN_PATHS']:
+        sys.path.insert(0, pluginpath)
+    for plugin in settings['PLUGINS']:
+        # if it's a string, then import it
+        if isinstance(plugin, six.string_types):
+            if plugin in sys.modules:
+                continue
+            logger.debug("Loading plugin `%s`", plugin)
+            try:
+                plugin = __import__(plugin, globals(), locals(),
+                                    str('module'))
+            except ImportError as e:
+                logger.error(
+                    "Cannot load plugin `%s`\n%s", plugin, e)
+                continue
+
+        else:  # the plugin was loaded explicitly by the user
+            if plugin.__name__ in sys.modules:
+                continue
+        logger.debug("Registering plugin `%s`", plugin.__name__)
+        plugin.register()
+        context.plugins.append(plugin)
+    logger.debug('Restoring system path')
+    sys.path = _sys_path
+
+
 def initialize(pelican):
     theme_config = pelican.settings.get('THEME_CONFIG', 'themeconf.py')
     settings = {}
     protected = pelican.settings.get('THEME_CONFIG_PROTECT', PROTECTED_OPTIONS)
+    preserved = {}
 
     if not isinstance(protected, list):
-        if isinstance(protected, str):
+        if isinstance(protected, six.string_types):
             logger.warning('THEME_CONFIG_PROTECT should be a list of values,'
                            'but a string was provided')
             protected = [protected]
@@ -81,19 +127,35 @@ def initialize(pelican):
         logger.debug('Theme provides a config "{}"'.format(theme_config))
 
         settings = dict(copy.deepcopy(pelican.settings))
+
         for p in protected:
             if settings.get(p) is not None:
-                settings.pop(p)
+                preserved.update({p: settings.get(p)})
 
         settings = load_config(theme_config, settings)
 
         for p in protected:
             if settings.get(p) is not None:
-                logger.warning('Theme cannot override {},'
-                               'ignoring'.format(p))
+                if p in preserved.keys():
+                    if settings[p] != preserved[p]:
+                        logger.warning('Theme cannot override {}, '
+                                       'ignoring'.format(p))
                 settings.pop(p)
 
         pelican.settings.update(settings)
+
+        # Edge case: we need to load possible additional plugins since
+        #            the earliest we could hook up into Pelican is after
+        #            all plugin initialisation was done.
+        init_plugins(pelican)
+
+        # disconnect ourself and re-emit the signal
+        # XXX: if there were any other modules connected to 'initialized'
+        #      and they were already triggered, we will trigger them
+        #      again.  If you know a solution for avoiding this, please
+        #      let me know.
+        signals.initialized.disconnect(initialize)
+        signals.initialized.send(pelican)
 
 
 def register():
