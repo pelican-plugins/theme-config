@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import os
-import logging
 import copy
+import logging
+import os
+from importlib.util import module_from_spec, spec_from_file_location
 
-from importlib.util import spec_from_file_location, module_from_spec
 from pelican import signals
 from pelican.settings import get_settings_from_module
 
 logger = logging.getLogger(__name__)
 
-protected = [
+PROTECTED_OPTIONS = [
                 'BIND',
                 'CACHE_PATH',
                 'PATH',
@@ -30,6 +30,8 @@ protected = [
                 'OUTPUT_PATH',
                 'SITEURL',
                 'THEME',
+                'THEME_CONFIG',
+                'THEME_CONFIG_PROTECT',
                 'PORT',
             ]
 
@@ -54,9 +56,22 @@ def load_config(config, context) -> dict:
     spec.loader.exec_module(module)
     return get_settings_from_module(module)
 
+
 def initialize(pelican):
     theme_config = pelican.settings.get('THEME_CONFIG', 'themeconf.py')
     settings = {}
+    protected = pelican.settings.get('THEME_CONFIG_PROTECT', PROTECTED_OPTIONS)
+
+    if not isinstance(protected, list):
+        if isinstance(protected, str):
+            logger.warning('THEME_CONFIG_PROTECT should be a list of values,'
+                           'but a string was provided')
+            protected = [protected]
+        else:
+            raise Exception(
+                'The theme_config module requires the THEME_CONFIG_PROTECT '
+                'configuration to be correctly set to be a list of strings. '
+                'Please check the documentation and correct the issue.')
 
     if not os.path.isfile(theme_config):
         theme_config = os.path.join(pelican.settings.get('THEME'),
@@ -67,7 +82,8 @@ def initialize(pelican):
 
         settings = dict(copy.deepcopy(pelican.settings))
         for p in protected:
-            settings.pop(p)
+            if settings.get(p) is not None:
+                settings.pop(p)
 
         settings = load_config(theme_config, settings)
 
@@ -78,6 +94,7 @@ def initialize(pelican):
                 settings.pop(p)
 
         pelican.settings.update(settings)
+
 
 def register():
     """Registers the plugin using the "initialized" event"""
