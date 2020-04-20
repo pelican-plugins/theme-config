@@ -22,6 +22,7 @@ from pelican import signals
 from pelican.settings import get_settings_from_module
 
 import six
+from pprint import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,7 @@ def initialize(pelican):
     settings = {}
     protected = pelican.settings.get('THEME_CONFIG_PROTECT', PROTECTED_OPTIONS)
     preserved = {}
+    initialised = []
 
     if not isinstance(protected, list):
         if isinstance(protected, six.string_types):
@@ -147,15 +149,26 @@ def initialize(pelican):
         # Edge case: we need to load possible additional plugins since
         #            the earliest we could hook up into Pelican is after
         #            all plugin initialisation was done.
+
+        # first, we memorise the current state in order to be able not
+        # to trigger the plugins that were already initialised by now
+        if signals.initialized.receivers:
+            for plugin in signals.initialized.receivers_for(pelican):
+                initialised.append(plugin)
+
+        # second, we load and register the newly defined plugins (if any)
         init_plugins(pelican)
 
-        # disconnect ourself and re-emit the signal
-        # XXX: if there were any other modules connected to 'initialized'
-        #      and they were already triggered, we will trigger them
-        #      again.  If you know a solution for avoiding this, please
-        #      let me know.
-        signals.initialized.disconnect(initialize)
-        signals.initialized.send(pelican)
+        # last, we call the initialisation of the plugins we did not
+        # save state for: remember we are in the "initialized" handler
+        # right now and if any plugin wanted to hook up there, this is
+        # our chance to trigger them.
+        if signals.initialized.receivers:
+            for plugin in signals.initialized.receivers_for(pelican):
+                if plugin not in initialised:
+                    plugin(pelican)
+
+        # this is amazing, isn't it?! :)
 
 
 def register():
