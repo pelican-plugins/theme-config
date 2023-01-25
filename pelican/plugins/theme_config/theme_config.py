@@ -18,10 +18,10 @@ import logging
 import os
 import sys
 
-from pelican.settings import get_settings_from_module
 import six
 
 from pelican import signals
+from pelican.settings import get_settings_from_module
 
 logger = logging.getLogger(__name__)
 
