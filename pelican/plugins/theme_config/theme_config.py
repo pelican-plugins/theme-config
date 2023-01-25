@@ -18,8 +18,6 @@ import logging
 import os
 import sys
 
-import six
-
 from pelican import signals
 from pelican.settings import get_settings_from_module
 
@@ -80,12 +78,12 @@ def init_plugins(context):
         sys.path.insert(0, pluginpath)
     for plugin in settings["PLUGINS"]:
         # if it's a string, then import it
-        if isinstance(plugin, six.string_types):
+        if isinstance(plugin, str):
             if plugin in sys.modules:
                 continue
             logger.debug("Loading plugin `%s`", plugin)
             try:
-                plugin = __import__(plugin, globals(), locals(), str("module"))
+                plugin = __import__(plugin, globals(), locals(), "module")
             except ImportError as e:
                 logger.error("Cannot load plugin `%s`\n%s", plugin, e)
                 continue
@@ -108,7 +106,7 @@ def initialize(pelican):
     initialised = []
 
     if not isinstance(protected, list):
-        if isinstance(protected, six.string_types):
+        if isinstance(protected, str):
             logger.warning(
                 "THEME_CONFIG_PROTECT should be a list of values,"
                 "but a string was provided"
@@ -125,7 +123,7 @@ def initialize(pelican):
         theme_config = os.path.join(pelican.settings.get("THEME"), theme_config)
 
     if os.path.isfile(theme_config):
-        logger.debug('Theme provides a config "{}"'.format(theme_config))
+        logger.debug(f'Theme provides a config "{theme_config}"')
 
         settings = dict(copy.deepcopy(pelican.settings))
 
