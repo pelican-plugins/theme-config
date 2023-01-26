@@ -9,18 +9,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Validate links in Markdown files
+        uses: JustinBeckwith/linkinator-action@v1
+        with:
+          retry: true
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
+
       - name: Upgrade Pip
         run: python -m pip install --upgrade pip
+
       - name: Install Poetry
         run: python -m pip install poetry
+
       - name: Install dependencies
         run: |
           poetry run pip install --upgrade pip
           poetry install --no-interaction
+
       - name: Run linters
         run: poetry run invoke lint --diff
 
