@@ -20,15 +20,11 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Upgrade Pip
-        run: python -m pip install --upgrade pip
-
       - name: Install Poetry
         run: python -m pip install poetry
 
       - name: Install dependencies
         run: |
-          poetry run pip install --upgrade pip
           poetry install --no-interaction
 
       - name: Run linters
