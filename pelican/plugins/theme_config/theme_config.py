@@ -19,6 +19,7 @@ import os
 import sys
 
 from pelican import signals
+from pelican.plugins._utils import get_plugin_name, load_plugins
 from pelican.settings import get_settings_from_module
 
 logger = logging.getLogger(__name__)
@@ -71,29 +72,24 @@ def init_plugins(context):
     :rtype: None
     """
 
-    settings = context.settings
     logger.debug("Temporarily adding PLUGIN_PATHS to system path")
     _sys_path = sys.path[:]
-    for pluginpath in settings["PLUGIN_PATHS"]:
+    for pluginpath in context.settings["PLUGIN_PATHS"]:
         sys.path.insert(0, pluginpath)
-    for plugin in settings["PLUGINS"]:
-        # if it's a string, then import it
-        if isinstance(plugin, str):
-            if plugin in sys.modules:
-                continue
-            logger.debug("Loading plugin `%s`", plugin)
-            try:
-                plugin = __import__(plugin, globals(), locals(), "module")
-            except ImportError as e:
-                logger.error("Cannot load plugin `%s`\n%s", plugin, e)
-                continue
+    for plugin in load_plugins(context.settings):
+        name = get_plugin_name(plugin)
+        if plugin in context.plugins:
+            logger.debug(f'Skipping plugin `{name}`, already registered')
+            continue
+        logger.debug('Registering plugin `%s`', name)
+        try:
+            plugin.register()
+            context.plugins.append(plugin)
+        except Exception as e:
+            logger.error('Cannot register plugin `%s`\n%s',
+                         name, e)
 
-        else:  # the plugin was loaded explicitly by the user
-            if plugin.__name__ in sys.modules:
-                continue
-        logger.debug("Registering plugin `%s`", plugin.__name__)
-        plugin.register()
-        context.plugins.append(plugin)
+    context.settings['PLUGINS'] = [get_plugin_name(p) for p in context.plugins]
     logger.debug("Restoring system path")
     sys.path = _sys_path
 
