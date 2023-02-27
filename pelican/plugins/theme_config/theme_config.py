@@ -79,17 +79,16 @@ def init_plugins(context):
     for plugin in load_plugins(context.settings):
         name = get_plugin_name(plugin)
         if plugin in context.plugins:
-            logger.debug(f'Skipping plugin `{name}`, already registered')
+            logger.debug(f"Skipping plugin `{name}`, already registered")
             continue
-        logger.debug('Registering plugin `%s`', name)
+        logger.debug("Registering plugin `%s`", name)
         try:
             plugin.register()
             context.plugins.append(plugin)
         except Exception as e:
-            logger.error('Cannot register plugin `%s`\n%s',
-                         name, e)
+            logger.error("Cannot register plugin `%s`\n%s", name, e)
 
-    context.settings['PLUGINS'] = [get_plugin_name(p) for p in context.plugins]
+    context.settings["PLUGINS"] = [get_plugin_name(p) for p in context.plugins]
     logger.debug("Restoring system path")
     sys.path = _sys_path
 
