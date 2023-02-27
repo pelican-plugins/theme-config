@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+2.0.2 - 2023-02-27
+------------------
+
+Updated the plugin loading logic to match the latest Pelican version.
+
 2.0.1 - 2023-01-26
 ------------------
 
