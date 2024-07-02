@@ -13,6 +13,7 @@ primary Pelican configuration file:
 This package does not expose any functions and is hooked up early in Pelican's
 start-up sequence leveraging the "initialized" Pelican event.
 """
+
 from .theme_config import register
 
 __all__ = ["register"]
